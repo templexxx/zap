@@ -1,5 +1,5 @@
-# Simplified Version of github.com/templexxx/zap
+# Simplified Version of github.com/uber-go/zap
 
-used by [FiniteBox][fBox]
+Is used by [FiniteBox][fBox]
 
 [fBox]: https://github.com/templexxx/finitebox
