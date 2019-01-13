@@ -25,7 +25,7 @@ import (
 	"math"
 	"time"
 
-	"go.uber.org/zap/zapcore"
+	"github.com/templexxx/zap/zapcore"
 )
 
 // Field is an alias for Field. Aliasing this type dramatically
@@ -181,18 +181,6 @@ func Stringer(key string, val fmt.Stringer) Field {
 // controls how the time is serialized.
 func Time(key string, val time.Time) Field {
 	return Field{Key: key, Type: zapcore.TimeType, Integer: val.UnixNano(), Interface: val.Location()}
-}
-
-// Stack constructs a field that stores a stacktrace of the current goroutine
-// under provided key. Keep in mind that taking a stacktrace is eager and
-// expensive (relatively speaking); this function both makes an allocation and
-// takes about two microseconds.
-func Stack(key string) Field {
-	// Returning the stacktrace as a string costs an allocation, but saves us
-	// from expanding the zapcore.Field union struct to include a byte slice. Since
-	// taking a stacktrace is already so expensive (~10us), the extra allocation
-	// is okay.
-	return String(key, takeStacktrace())
 }
 
 // Duration constructs a field with the given key and value. The encoder

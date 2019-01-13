@@ -27,9 +27,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.uber.org/zap"
-	"go.uber.org/zap/internal/ztest"
-	"go.uber.org/zap/zapcore"
+	"github.com/templexxx/zap"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -80,30 +78,6 @@ func TestTestLoggerSupportsLevels(t *testing.T) {
 	)
 }
 
-func TestTestLoggerSupportsWrappedZapOptions(t *testing.T) {
-	ts := newTestLogSpy(t)
-	defer ts.AssertPassed()
-
-	log := NewLogger(ts, WrapOptions(zap.AddCaller(), zap.Fields(zap.String("k1", "v1"))))
-
-	log.Info("received work order")
-	log.Debug("starting work")
-	log.Warn("work may fail")
-	log.Error("work failed", zap.Error(errors.New("great sadness")))
-
-	assert.Panics(t, func() {
-		log.Panic("failed to do work")
-	}, "log.Panic should panic")
-
-	ts.AssertMessages(
-		`INFO	zaptest/logger_test.go:89	received work order	{"k1": "v1"}`,
-		`DEBUG	zaptest/logger_test.go:90	starting work	{"k1": "v1"}`,
-		`WARN	zaptest/logger_test.go:91	work may fail	{"k1": "v1"}`,
-		`ERROR	zaptest/logger_test.go:92	work failed	{"k1": "v1", "error": "great sadness"}`,
-		`PANIC	zaptest/logger_test.go:95	failed to do work	{"k1": "v1"}`,
-	)
-}
-
 func TestTestingWriter(t *testing.T) {
 	ts := newTestLogSpy(t)
 	w := newTestingWriter(ts)
@@ -111,31 +85,6 @@ func TestTestingWriter(t *testing.T) {
 	n, err := io.WriteString(w, "hello\n\n")
 	assert.NoError(t, err, "WriteString must not fail")
 	assert.Equal(t, 7, n)
-}
-
-func TestTestLoggerErrorOutput(t *testing.T) {
-	// This test verifies that the test logger logs internal messages to the
-	// testing.T and marks the test as failed.
-
-	ts := newTestLogSpy(t)
-	defer ts.AssertFailed()
-
-	log := NewLogger(ts)
-
-	// Replace with a core that fails.
-	log = log.WithOptions(zap.WrapCore(func(zapcore.Core) zapcore.Core {
-		return zapcore.NewCore(
-			zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
-			zapcore.Lock(zapcore.AddSync(ztest.FailWriter{})),
-			zapcore.DebugLevel,
-		)
-	}))
-
-	log.Info("foo") // this fails
-
-	if assert.Len(t, ts.Messages, 1, "expected a log message") {
-		assert.Regexp(t, `write error: failed`, ts.Messages[0])
-	}
 }
 
 // testLogSpy is a testing.TB that captures logged messages.

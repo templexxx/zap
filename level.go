@@ -21,8 +21,8 @@
 package zap
 
 import (
+	"github.com/templexxx/zap/zapcore"
 	"go.uber.org/atomic"
-	"go.uber.org/zap/zapcore"
 )
 
 const (
@@ -37,9 +37,6 @@ const (
 	// ErrorLevel logs are high-priority. If an application is running smoothly,
 	// it shouldn't generate any error-level logs.
 	ErrorLevel = zapcore.ErrorLevel
-	// DPanicLevel logs are particularly important errors. In development the
-	// logger panics after writing the message.
-	DPanicLevel = zapcore.DPanicLevel
 	// PanicLevel logs a message, then panics.
 	PanicLevel = zapcore.PanicLevel
 	// FatalLevel logs a message, then calls os.Exit(1).

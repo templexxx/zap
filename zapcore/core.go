@@ -42,17 +42,10 @@ type Core interface {
 	Write(Entry, []Field) error
 	// Sync flushes buffered logs (if any).
 	Sync() error
+
+	// ReOpen open log file again for log rotation
+	ReOpen() error
 }
-
-type nopCore struct{}
-
-// NewNopCore returns a no-op Core.
-func NewNopCore() Core                                        { return nopCore{} }
-func (nopCore) Enabled(Level) bool                            { return false }
-func (n nopCore) With([]Field) Core                           { return n }
-func (nopCore) Check(_ Entry, ce *CheckedEntry) *CheckedEntry { return ce }
-func (nopCore) Write(Entry, []Field) error                    { return nil }
-func (nopCore) Sync() error                                   { return nil }
 
 // NewCore creates a Core that writes logs to a WriteSyncer.
 func NewCore(enc Encoder, ws WriteSyncer, enab LevelEnabler) Core {
@@ -102,6 +95,10 @@ func (c *ioCore) Write(ent Entry, fields []Field) error {
 
 func (c *ioCore) Sync() error {
 	return c.out.Sync()
+}
+
+func (c *ioCore) ReOpen() error {
+	return c.out.ReOpen()
 }
 
 func (c *ioCore) clone() *ioCore {

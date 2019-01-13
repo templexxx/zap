@@ -20,17 +20,16 @@
 
 package zapcore
 
-import "go.uber.org/zap/internal/color"
+import "github.com/templexxx/zap/internal/color"
 
 var (
 	_levelToColor = map[Level]color.Color{
-		DebugLevel:  color.Magenta,
-		InfoLevel:   color.Blue,
-		WarnLevel:   color.Yellow,
-		ErrorLevel:  color.Red,
-		DPanicLevel: color.Red,
-		PanicLevel:  color.Red,
-		FatalLevel:  color.Red,
+		DebugLevel: color.Magenta,
+		InfoLevel:  color.Blue,
+		WarnLevel:  color.Yellow,
+		ErrorLevel: color.Red,
+		PanicLevel: color.Red,
+		FatalLevel: color.Red,
 	}
 	_unknownLevelColor = color.Red
 

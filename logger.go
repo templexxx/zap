@@ -21,14 +21,9 @@
 package zap
 
 import (
-	"fmt"
-	"io/ioutil"
-	"os"
-	"runtime"
-	"strings"
 	"time"
 
-	"go.uber.org/zap/zapcore"
+	"github.com/templexxx/zap/zapcore"
 )
 
 // A Logger provides fast, leveled, structured logging. All methods are safe
@@ -40,15 +35,10 @@ import (
 // better balance between performance and ergonomics.
 type Logger struct {
 	core zapcore.Core
+}
 
-	development bool
-	name        string
-	errorOutput zapcore.WriteSyncer
-
-	addCaller bool
-	addStack  zapcore.LevelEnabler
-
-	callerSkip int
+func (l *Logger) ReOpen() error {
+	return l.core.ReOpen()
 }
 
 // New constructs a new Logger from the provided zapcore.Core and Options. If
@@ -62,86 +52,11 @@ type Logger struct {
 //
 // For sample code, see the package-level AdvancedConfiguration example.
 func New(core zapcore.Core, options ...Option) *Logger {
-	if core == nil {
-		return NewNop()
-	}
+
 	log := &Logger{
-		core:        core,
-		errorOutput: zapcore.Lock(os.Stderr),
-		addStack:    zapcore.FatalLevel + 1,
+		core: core,
 	}
 	return log.WithOptions(options...)
-}
-
-// NewNop returns a no-op Logger. It never writes out logs or internal errors,
-// and it never runs user-defined hooks.
-//
-// Using WithOptions to replace the Core or error output of a no-op Logger can
-// re-enable logging.
-func NewNop() *Logger {
-	return &Logger{
-		core:        zapcore.NewNopCore(),
-		errorOutput: zapcore.AddSync(ioutil.Discard),
-		addStack:    zapcore.FatalLevel + 1,
-	}
-}
-
-// NewProduction builds a sensible production Logger that writes InfoLevel and
-// above logs to standard error as JSON.
-//
-// It's a shortcut for NewProductionConfig().Build(...Option).
-func NewProduction(options ...Option) (*Logger, error) {
-	return NewProductionConfig().Build(options...)
-}
-
-// NewDevelopment builds a development Logger that writes DebugLevel and above
-// logs to standard error in a human-friendly format.
-//
-// It's a shortcut for NewDevelopmentConfig().Build(...Option).
-func NewDevelopment(options ...Option) (*Logger, error) {
-	return NewDevelopmentConfig().Build(options...)
-}
-
-// NewExample builds a Logger that's designed for use in zap's testable
-// examples. It writes DebugLevel and above logs to standard out as JSON, but
-// omits the timestamp and calling function to keep example output
-// short and deterministic.
-func NewExample(options ...Option) *Logger {
-	encoderCfg := zapcore.EncoderConfig{
-		MessageKey:     "msg",
-		LevelKey:       "level",
-		NameKey:        "logger",
-		EncodeLevel:    zapcore.LowercaseLevelEncoder,
-		EncodeTime:     zapcore.ISO8601TimeEncoder,
-		EncodeDuration: zapcore.StringDurationEncoder,
-	}
-	core := zapcore.NewCore(zapcore.NewJSONEncoder(encoderCfg), os.Stdout, DebugLevel)
-	return New(core).WithOptions(options...)
-}
-
-// Sugar wraps the Logger to provide a more ergonomic, but slightly slower,
-// API. Sugaring a Logger is quite inexpensive, so it's reasonable for a
-// single application to use both Loggers and SugaredLoggers, converting
-// between them on the boundaries of performance-sensitive code.
-func (log *Logger) Sugar() *SugaredLogger {
-	core := log.clone()
-	core.callerSkip += 2
-	return &SugaredLogger{core}
-}
-
-// Named adds a new path segment to the logger's name. Segments are joined by
-// periods. By default, Loggers are unnamed.
-func (log *Logger) Named(s string) *Logger {
-	if s == "" {
-		return log
-	}
-	l := log.clone()
-	if log.name == "" {
-		l.name = s
-	} else {
-		l.name = strings.Join([]string{l.name, s}, ".")
-	}
-	return l
 }
 
 // WithOptions clones the current Logger, applies the supplied Options, and
@@ -204,18 +119,6 @@ func (log *Logger) Error(msg string, fields ...Field) {
 	}
 }
 
-// DPanic logs a message at DPanicLevel. The message includes any fields
-// passed at the log site, as well as any fields accumulated on the logger.
-//
-// If the logger is in development mode, it then panics (DPanic means
-// "development panic"). This is useful for catching errors that are
-// recoverable, but shouldn't ever happen.
-func (log *Logger) DPanic(msg string, fields ...Field) {
-	if ce := log.check(DPanicLevel, msg); ce != nil {
-		ce.Write(fields...)
-	}
-}
-
 // Panic logs a message at PanicLevel. The message includes any fields passed
 // at the log site, as well as any fields accumulated on the logger.
 //
@@ -261,10 +164,9 @@ func (log *Logger) check(lvl zapcore.Level, msg string) *zapcore.CheckedEntry {
 	// Create basic checked entry thru the core; this will be non-nil if the
 	// log message will actually be written somewhere.
 	ent := zapcore.Entry{
-		LoggerName: log.name,
-		Time:       time.Now(),
-		Level:      lvl,
-		Message:    msg,
+		Time:    time.Now(),
+		Level:   lvl,
+		Message: msg,
 	}
 	ce := log.core.Check(ent, nil)
 	willWrite := ce != nil
@@ -275,10 +177,6 @@ func (log *Logger) check(lvl zapcore.Level, msg string) *zapcore.CheckedEntry {
 		ce = ce.Should(ent, zapcore.WriteThenPanic)
 	case zapcore.FatalLevel:
 		ce = ce.Should(ent, zapcore.WriteThenFatal)
-	case zapcore.DPanicLevel:
-		if log.development {
-			ce = ce.Should(ent, zapcore.WriteThenPanic)
-		}
 	}
 
 	// Only do further annotation if we're going to write this message; checked
@@ -286,19 +184,6 @@ func (log *Logger) check(lvl zapcore.Level, msg string) *zapcore.CheckedEntry {
 	// annotation.
 	if !willWrite {
 		return ce
-	}
-
-	// Thread the error output through to the CheckedEntry.
-	ce.ErrorOutput = log.errorOutput
-	if log.addCaller {
-		ce.Entry.Caller = zapcore.NewEntryCaller(runtime.Caller(log.callerSkip + callerSkipOffset))
-		if !ce.Entry.Caller.Defined {
-			fmt.Fprintf(log.errorOutput, "%v Logger.check error: failed to get caller\n", time.Now().UTC())
-			log.errorOutput.Sync()
-		}
-	}
-	if log.addStack.Enabled(ce.Entry.Level) {
-		ce.Entry.Stack = Stack("").String
 	}
 
 	return ce

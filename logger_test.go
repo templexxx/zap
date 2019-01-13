@@ -21,17 +21,14 @@
 package zap
 
 import (
-	"errors"
 	"sync"
 	"testing"
 
-	"go.uber.org/zap/internal/exit"
-	"go.uber.org/zap/internal/ztest"
-	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zaptest/observer"
+	"github.com/templexxx/zap/internal/exit"
+	"github.com/templexxx/zap/zapcore"
+	"github.com/templexxx/zap/zaptest/observer"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 )
 
@@ -178,7 +175,6 @@ func TestLoggerLeveledMethods(t *testing.T) {
 			{logger.Info, InfoLevel},
 			{logger.Warn, WarnLevel},
 			{logger.Error, ErrorLevel},
-			{logger.DPanic, DPanicLevel},
 		}
 		for i, tt := range tests {
 			tt.method("")
@@ -227,27 +223,6 @@ func TestLoggerAlwaysFatals(t *testing.T) {
 	})
 }
 
-func TestLoggerDPanic(t *testing.T) {
-	withLogger(t, DebugLevel, nil, func(logger *Logger, logs *observer.ObservedLogs) {
-		assert.NotPanics(t, func() { logger.DPanic("") })
-		assert.Equal(
-			t,
-			[]observer.LoggedEntry{{Entry: zapcore.Entry{Level: DPanicLevel}, Context: []Field{}}},
-			logs.AllUntimed(),
-			"Unexpected log output from DPanic in production mode.",
-		)
-	})
-	withLogger(t, DebugLevel, opts(Development()), func(logger *Logger, logs *observer.ObservedLogs) {
-		assert.Panics(t, func() { logger.DPanic("") })
-		assert.Equal(
-			t,
-			[]observer.LoggedEntry{{Entry: zapcore.Entry{Level: DPanicLevel}, Context: []Field{}}},
-			logs.AllUntimed(),
-			"Unexpected log output from DPanic in development mode.",
-		)
-	})
-}
-
 func TestLoggerNoOpsDisabledLevels(t *testing.T) {
 	withLogger(t, WarnLevel, nil, func(logger *Logger, logs *observer.ObservedLogs) {
 		logger.Info("silence!")
@@ -257,138 +232,6 @@ func TestLoggerNoOpsDisabledLevels(t *testing.T) {
 			logs.AllUntimed(),
 			"Expected logging at a disabled level to produce no output.",
 		)
-	})
-}
-
-func TestLoggerNames(t *testing.T) {
-	tests := []struct {
-		names    []string
-		expected string
-	}{
-		{nil, ""},
-		{[]string{""}, ""},
-		{[]string{"foo"}, "foo"},
-		{[]string{"foo", ""}, "foo"},
-		{[]string{"foo", "bar"}, "foo.bar"},
-		{[]string{"foo.bar", "baz"}, "foo.bar.baz"},
-		// Garbage in, garbage out.
-		{[]string{"foo.", "bar"}, "foo..bar"},
-		{[]string{"foo", ".bar"}, "foo..bar"},
-		{[]string{"foo.", ".bar"}, "foo...bar"},
-	}
-
-	for _, tt := range tests {
-		withLogger(t, DebugLevel, nil, func(log *Logger, logs *observer.ObservedLogs) {
-			for _, n := range tt.names {
-				log = log.Named(n)
-			}
-			log.Info("")
-			require.Equal(t, 1, logs.Len(), "Expected only one log entry to be written.")
-			assert.Equal(t, tt.expected, logs.AllUntimed()[0].Entry.LoggerName, "Unexpected logger name.")
-		})
-		withSugar(t, DebugLevel, nil, func(log *SugaredLogger, logs *observer.ObservedLogs) {
-			for _, n := range tt.names {
-				log = log.Named(n)
-			}
-			log.Infow("")
-			require.Equal(t, 1, logs.Len(), "Expected only one log entry to be written.")
-			assert.Equal(t, tt.expected, logs.AllUntimed()[0].Entry.LoggerName, "Unexpected logger name.")
-		})
-	}
-}
-
-func TestLoggerWriteFailure(t *testing.T) {
-	errSink := &ztest.Buffer{}
-	logger := New(
-		zapcore.NewCore(
-			zapcore.NewJSONEncoder(NewProductionConfig().EncoderConfig),
-			zapcore.Lock(zapcore.AddSync(ztest.FailWriter{})),
-			DebugLevel,
-		),
-		ErrorOutput(errSink),
-	)
-
-	logger.Info("foo")
-	// Should log the error.
-	assert.Regexp(t, `write error: failed`, errSink.Stripped(), "Expected to log the error to the error output.")
-	assert.True(t, errSink.Called(), "Expected logging an internal error to call Sync the error sink.")
-}
-
-func TestLoggerSync(t *testing.T) {
-	withLogger(t, DebugLevel, nil, func(logger *Logger, _ *observer.ObservedLogs) {
-		assert.NoError(t, logger.Sync(), "Expected syncing a test logger to succeed.")
-		assert.NoError(t, logger.Sugar().Sync(), "Expected syncing a sugared logger to succeed.")
-	})
-}
-
-func TestLoggerSyncFail(t *testing.T) {
-	noSync := &ztest.Buffer{}
-	err := errors.New("fail")
-	noSync.SetError(err)
-	logger := New(zapcore.NewCore(
-		zapcore.NewJSONEncoder(zapcore.EncoderConfig{}),
-		noSync,
-		DebugLevel,
-	))
-	assert.Equal(t, err, logger.Sync(), "Expected Logger.Sync to propagate errors.")
-	assert.Equal(t, err, logger.Sugar().Sync(), "Expected SugaredLogger.Sync to propagate errors.")
-}
-
-func TestLoggerAddCaller(t *testing.T) {
-	tests := []struct {
-		options []Option
-		pat     string
-	}{
-		{opts(AddCaller()), `.+/logger_test.go:[\d]+$`},
-		{opts(AddCaller(), AddCallerSkip(1), AddCallerSkip(-1)), `.+/zap/logger_test.go:[\d]+$`},
-		{opts(AddCaller(), AddCallerSkip(1)), `.+/zap/common_test.go:[\d]+$`},
-		{opts(AddCaller(), AddCallerSkip(1), AddCallerSkip(3)), `.+/src/runtime/.*:[\d]+$`},
-	}
-	for _, tt := range tests {
-		withLogger(t, DebugLevel, tt.options, func(logger *Logger, logs *observer.ObservedLogs) {
-			// Make sure that sugaring and desugaring resets caller skip properly.
-			logger = logger.Sugar().Desugar()
-			logger.Info("")
-			output := logs.AllUntimed()
-			assert.Equal(t, 1, len(output), "Unexpected number of logs written out.")
-			assert.Regexp(
-				t,
-				tt.pat,
-				output[0].Entry.Caller,
-				"Expected to find package name and file name in output.",
-			)
-		})
-	}
-}
-
-func TestLoggerAddCallerFail(t *testing.T) {
-	errBuf := &ztest.Buffer{}
-	withLogger(t, DebugLevel, opts(AddCaller(), ErrorOutput(errBuf)), func(log *Logger, logs *observer.ObservedLogs) {
-		log.callerSkip = 1e3
-		log.Info("Failure.")
-		assert.Regexp(
-			t,
-			`Logger.check error: failed to get caller`,
-			errBuf.String(),
-			"Didn't find expected failure message.",
-		)
-		assert.Equal(
-			t,
-			logs.AllUntimed()[0].Entry.Message,
-			"Failure.",
-			"Expected original message to survive failures in runtime.Caller.")
-	})
-}
-
-func TestLoggerReplaceCore(t *testing.T) {
-	replace := WrapCore(func(zapcore.Core) zapcore.Core {
-		return zapcore.NewNopCore()
-	})
-	withLogger(t, DebugLevel, opts(replace), func(logger *Logger, logs *observer.ObservedLogs) {
-		logger.Debug("")
-		logger.Info("")
-		logger.Warn("")
-		assert.Equal(t, 0, logs.Len(), "Expected no-op core to write no logs.")
 	})
 }
 

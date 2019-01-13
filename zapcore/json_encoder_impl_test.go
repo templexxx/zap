@@ -30,7 +30,7 @@ import (
 	"testing/quick"
 	"time"
 
-	"go.uber.org/zap/internal/bufferpool"
+	"github.com/templexxx/zap/internal/bufferpool"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/multierr"

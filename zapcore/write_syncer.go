@@ -23,8 +23,6 @@ package zapcore
 import (
 	"io"
 	"sync"
-
-	"go.uber.org/multierr"
 )
 
 // A WriteSyncer is an io.Writer that can also flush any buffered data. Note
@@ -32,18 +30,7 @@ import (
 type WriteSyncer interface {
 	io.Writer
 	Sync() error
-}
-
-// AddSync converts an io.Writer to a WriteSyncer. It attempts to be
-// intelligent: if the concrete type of the io.Writer implements WriteSyncer,
-// we'll use the existing Sync method. If it doesn't, we'll add a no-op Sync.
-func AddSync(w io.Writer) WriteSyncer {
-	switch w := w.(type) {
-	case WriteSyncer:
-		return w
-	default:
-		return writerWrapper{w}
-	}
+	ReOpen() error
 }
 
 type lockedWriteSyncer struct {
@@ -75,49 +62,9 @@ func (s *lockedWriteSyncer) Sync() error {
 	return err
 }
 
-type writerWrapper struct {
-	io.Writer
-}
-
-func (w writerWrapper) Sync() error {
-	return nil
-}
-
-type multiWriteSyncer []WriteSyncer
-
-// NewMultiWriteSyncer creates a WriteSyncer that duplicates its writes
-// and sync calls, much like io.MultiWriter.
-func NewMultiWriteSyncer(ws ...WriteSyncer) WriteSyncer {
-	if len(ws) == 1 {
-		return ws[0]
-	}
-	// Copy to protect against https://github.com/golang/go/issues/7809
-	return multiWriteSyncer(append([]WriteSyncer(nil), ws...))
-}
-
-// See https://golang.org/src/io/multi.go
-// When not all underlying syncers write the same number of bytes,
-// the smallest number is returned even though Write() is called on
-// all of them.
-func (ws multiWriteSyncer) Write(p []byte) (int, error) {
-	var writeErr error
-	nWritten := 0
-	for _, w := range ws {
-		n, err := w.Write(p)
-		writeErr = multierr.Append(writeErr, err)
-		if nWritten == 0 && n != 0 {
-			nWritten = n
-		} else if n < nWritten {
-			nWritten = n
-		}
-	}
-	return nWritten, writeErr
-}
-
-func (ws multiWriteSyncer) Sync() error {
-	var err error
-	for _, w := range ws {
-		err = multierr.Append(err, w.Sync())
-	}
+func (s *lockedWriteSyncer) ReOpen() error {
+	s.Lock()
+	err := s.ws.ReOpen()
+	s.Unlock()
 	return err
 }

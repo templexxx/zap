@@ -24,8 +24,8 @@ import (
 	"sync"
 	"testing"
 
-	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zaptest/observer"
+	"github.com/templexxx/zap/zapcore"
+	"github.com/templexxx/zap/zaptest/observer"
 )
 
 func opts(opts ...Option) []Option {
@@ -38,10 +38,6 @@ func withLogger(t testing.TB, e zapcore.LevelEnabler, opts []Option, f func(*Log
 	fac, logs := observer.New(e)
 	log := New(fac, opts...)
 	f(log, logs)
-}
-
-func withSugar(t testing.TB, e zapcore.LevelEnabler, opts []Option, f func(*SugaredLogger, *observer.ObservedLogs)) {
-	withLogger(t, e, opts, func(logger *Logger, logs *observer.ObservedLogs) { f(logger.Sugar(), logs) })
 }
 
 func runConcurrently(goroutines, iterations int, wg *sync.WaitGroup, f func()) {
