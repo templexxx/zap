@@ -69,6 +69,7 @@ func (cfg Config) Build(opts ...Option) (*Logger, error) {
 
 	f, err := os.OpenFile(cfg.OutputPath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
+		f.Close()
 		return nil, err
 	}
 
