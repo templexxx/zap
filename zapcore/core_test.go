@@ -47,7 +47,7 @@ func TestIOCore(t *testing.T) {
 
 	core := NewCore(
 		NewJSONEncoder(cfg),
-		Buffer(temp, 32*1024, temp.Name()),
+		Buffer(temp, 32*1024, 1, temp.Name()),
 		InfoLevel,
 	).With([]Field{makeInt64Field("k", 1)})
 	defer assert.NoError(t, core.Sync(), "Expected Syncing a temp file to succeed.")
