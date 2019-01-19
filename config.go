@@ -55,9 +55,12 @@ type Config struct {
 	// See Open for details.
 	OutputPath string `json:"outputPath" yaml:"outputPath"`
 
-	// BufSize log write buf
-	// See zapcore/writebuf.go for details
+	// BufSize log write buf,
+	// See zapcore/writebuf.go for details.
 	BufSize int `json:"bufSize" yaml:"bufSize"`
+
+	// Flush will flush log buf every Flush seconds.
+	Flush int `json:"flush" yaml:"flush"`
 }
 
 // Build constructs a logger from the Config and Options.
@@ -69,12 +72,11 @@ func (cfg Config) Build(opts ...Option) (*Logger, error) {
 
 	f, err := os.OpenFile(cfg.OutputPath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
-		f.Close()
 		return nil, err
 	}
 
 	log := New(
-		zapcore.NewCore(enc, zapcore.Buffer(f, cfg.BufSize, cfg.OutputPath), cfg.Level),
+		zapcore.NewCore(enc, zapcore.Buffer(f, cfg.BufSize, cfg.Flush, cfg.OutputPath), cfg.Level),
 	)
 	if len(opts) > 0 {
 		log = log.WithOptions(opts...)

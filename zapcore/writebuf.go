@@ -3,6 +3,7 @@ package zapcore
 import (
 	"bufio"
 	"os"
+	"time"
 )
 
 // log with bufio
@@ -17,7 +18,7 @@ type bufWriterSync struct {
 }
 
 // Buffer wraps a WriteSyncer with bufio
-func Buffer(f *os.File, size int, outputPath string) WriteSyncer {
+func Buffer(f *os.File, size, flush int, outputPath string) WriteSyncer {
 	bw := &bufWriterSync{
 		buf:  bufio.NewWriterSize(f, size),
 		size: size,
@@ -31,6 +32,14 @@ func Buffer(f *os.File, size int, outputPath string) WriteSyncer {
 	go cleanOldFile(bw.c)
 
 	w := Lock(bw) // need lock for concurrence safe
+
+	go func() {
+		ticker := time.NewTicker(time.Duration(flush) * time.Second)
+		for range ticker.C {
+			w.Sync()
+		}
+	}()
+
 	return w
 }
 
@@ -47,7 +56,6 @@ func (w *bufWriterSync) ReOpen() (err error) {
 	w.c <- w.f // non-blocking here for avoiding stuck all log write
 	f, err := os.OpenFile(w.outputPath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
-		f.Close()
 		return
 	}
 	w.buf = bufio.NewWriterSize(f, w.size)
