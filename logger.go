@@ -188,3 +188,9 @@ func (log *Logger) check(lvl zapcore.Level, msg string) *zapcore.CheckedEntry {
 
 	return ce
 }
+
+func NewNop() *Logger {
+	return &Logger{
+		core: zapcore.NewNopCore(),
+	}
+}
