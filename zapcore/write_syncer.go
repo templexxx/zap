@@ -33,6 +33,30 @@ type WriteSyncer interface {
 	ReOpen() error
 }
 
+// AddSync converts an io.Writer to a WriteSyncer. It attempts to be
+// intelligent: if the concrete type of the io.Writer implements WriteSyncer,
+// we'll use the existing Sync method. If it doesn't, we'll add a no-op Sync.
+func AddSync(w io.Writer) WriteSyncer {
+	switch w := w.(type) {
+	case WriteSyncer:
+		return w
+	default:
+		return writerWrapper{w}
+	}
+}
+
+type writerWrapper struct {
+	io.Writer
+}
+
+func (w writerWrapper) Sync() error {
+	return nil
+}
+
+func (w writerWrapper) ReOpen() error {
+	return nil
+}
+
 type lockedWriteSyncer struct {
 	sync.Mutex
 	ws WriteSyncer
