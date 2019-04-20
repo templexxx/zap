@@ -88,6 +88,8 @@ func (cfg Config) buildEncoder() (zapcore.Encoder, error) {
 	return newEncoder(cfg.Encoding, cfg.EncoderConfig)
 }
 
+const defaultFlush = 5
+
 func openSyncer(cfg Config) (zapcore.WriteSyncer, error) {
 	switch cfg.OutputPath {
 	case "stdout":
@@ -98,6 +100,9 @@ func openSyncer(cfg Config) (zapcore.WriteSyncer, error) {
 		f, err := os.OpenFile(cfg.OutputPath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 		if err != nil {
 			return nil, err
+		}
+		if cfg.Flush == 0 {
+			cfg.Flush = 5
 		}
 		return zapcore.Buffer(f, cfg.BufSize, cfg.Flush, cfg.OutputPath), nil
 	}
