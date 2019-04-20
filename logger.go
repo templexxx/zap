@@ -194,3 +194,11 @@ func NewNop() *Logger {
 		core: zapcore.NewNopCore(),
 	}
 }
+
+func NewExample() *Logger {
+	cfg := DefaultConfig()
+	cfg.OutputPath = "stdout"
+	cfg.Level = NewAtomicLevelAt(DebugLevel)
+	zapl, _ := cfg.Build()
+	return zapl
+}
