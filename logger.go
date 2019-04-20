@@ -202,3 +202,7 @@ func NewExample() *Logger {
 	zapl, _ := cfg.Build()
 	return zapl
 }
+
+func NewProduction() (*Logger, error) {
+	return DefaultConfig().Build()
+}
