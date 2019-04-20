@@ -70,13 +70,13 @@ func (cfg Config) Build(opts ...Option) (*Logger, error) {
 		return nil, err
 	}
 
-	f, err := os.OpenFile(cfg.OutputPath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	syncer, err := openSyncer(cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	log := New(
-		zapcore.NewCore(enc, zapcore.Buffer(f, cfg.BufSize, cfg.Flush, cfg.OutputPath), cfg.Level),
+		zapcore.NewCore(enc, syncer, cfg.Level),
 	)
 	if len(opts) > 0 {
 		log = log.WithOptions(opts...)
@@ -86,4 +86,47 @@ func (cfg Config) Build(opts ...Option) (*Logger, error) {
 
 func (cfg Config) buildEncoder() (zapcore.Encoder, error) {
 	return newEncoder(cfg.Encoding, cfg.EncoderConfig)
+}
+
+func openSyncer(cfg Config) (zapcore.WriteSyncer, error) {
+	switch cfg.OutputPath {
+	case "stdout":
+		return zapcore.Lock(nopReOpenSyner{os.Stdout}), nil
+	case "stderr":
+		return zapcore.Lock(nopReOpenSyner{os.Stderr}), nil
+	default:
+		f, err := os.OpenFile(cfg.OutputPath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+		if err != nil {
+			return nil, err
+		}
+		return zapcore.Buffer(f, cfg.BufSize, cfg.Flush, cfg.OutputPath), nil
+	}
+}
+
+type nopReOpenSyner struct {
+	*os.File
+}
+
+func (nopReOpenSyner) ReOpen() error {
+	return nil
+}
+
+func DefaultConfig() Config {
+	return Config{
+		Level:         NewAtomicLevelAt(InfoLevel),
+		Encoding:      "json",
+		EncoderConfig: DefaultEncoderConf(),
+		OutputPath:    "stderr",
+	}
+}
+
+func DefaultEncoderConf() zapcore.EncoderConfig {
+	return zapcore.EncoderConfig{
+		TimeKey:     "time",
+		LevelKey:    "level",
+		MessageKey:  "msg",
+		LineEnding:  zapcore.DefaultLineEnding,
+		EncodeLevel: zapcore.LowercaseLevelEncoder,
+		EncodeTime:  zapcore.ISO8601TimeEncoder,
+	}
 }
