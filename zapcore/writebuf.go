@@ -66,15 +66,16 @@ func (w *bufWriterSync) ReOpen() (err error) {
 // cleanOldFile will close, sync, drop page_cache
 func cleanOldFile(c chan *os.File) {
 	for f := range c {
-		defer f.Close()
 		info, err := f.Stat()
 		if err != nil {
+			f.Close()
 			continue
 		}
 		size := info.Size()
 
 		f.Sync()
 		dropCache(f, 0, size)
+		f.Close()
 	}
 }
 
