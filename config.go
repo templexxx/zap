@@ -127,11 +127,12 @@ func DefaultConfig() Config {
 
 func DefaultEncoderConf() zapcore.EncoderConfig {
 	return zapcore.EncoderConfig{
-		TimeKey:     "time",
-		LevelKey:    "level",
-		MessageKey:  "msg",
-		LineEnding:  zapcore.DefaultLineEnding,
-		EncodeLevel: zapcore.LowercaseLevelEncoder,
-		EncodeTime:  zapcore.ISO8601TimeEncoder,
+		TimeKey:        "time",
+		LevelKey:       "level",
+		MessageKey:     "msg",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.LowercaseLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.StringDurationEncoder,
 	}
 }
