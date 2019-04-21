@@ -1,5 +1,8 @@
 # Simplified Version of github.com/uber-go/zap
 
-Is used by [FiniteBox][fBox]
+Delete lots of codes.
 
-[fBox]: https://github.com/templexxx/finitebox
+Add WriteSyncer with buffer.
+
+Only for [FiniteBox][https://github.com/templexxx/finitebox]
+
